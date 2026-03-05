@@ -30,19 +30,19 @@ result_limit=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -m | --missing)
-      show_missing=1
-      shift
-      continue
-      ;;
-    -h | --help)
-      print_usage
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
+  -m | --missing)
+    show_missing=1
+    shift
+    continue
+    ;;
+  -h | --help)
+    print_usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
   esac
 
   if [ -z "$main_reference" ]; then
@@ -72,9 +72,9 @@ base_reference_argument="${base_reference_argument:-staging}"
 result_limit="${result_limit:-500}"
 
 case "$result_limit" in
-  "" | *[!0-9]*)
-    result_limit=500
-    ;;
+"" | *[!0-9]*)
+  result_limit=500
+  ;;
 esac
 
 if [ "$result_limit" -eq 0 ]; then
@@ -111,8 +111,8 @@ pr_rows="$(
   exit "$gh_exit_code"
 }
 
-printf '%s\n' "$pr_rows" \
-  | while IFS="$tab_char" read -r pr_number pr_title pr_merged_at merge_commit_sha; do
+printf '%s\n' "$pr_rows" |
+  while IFS="$tab_char" read -r pr_number pr_title pr_merged_at merge_commit_sha; do
     merge_commit_sha="${merge_commit_sha:-}"
 
     if [ -z "$pr_number$pr_title$pr_merged_at$merge_commit_sha" ]; then

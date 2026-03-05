@@ -1,2 +1,0 @@
-# This project ships shell scripts only.
-# Python dependencies are intentionally empty.

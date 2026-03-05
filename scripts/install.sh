@@ -19,18 +19,18 @@ quote_for_sh() {
 force_overwrite=0
 for option in "$@"; do
   case "$option" in
-    --force)
-      force_overwrite=1
-      ;;
-    -h | --help)
-      print_usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $option" >&2
-      print_usage >&2
-      exit 1
-      ;;
+  --force)
+    force_overwrite=1
+    ;;
+  -h | --help)
+    print_usage
+    exit 0
+    ;;
+  *)
+    echo "Unknown option: $option" >&2
+    print_usage >&2
+    exit 1
+    ;;
   esac
 done
 

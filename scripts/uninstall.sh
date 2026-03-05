@@ -19,18 +19,18 @@ quote_for_sh() {
 remove_all_values=0
 for option in "$@"; do
   case "$option" in
-    --all)
-      remove_all_values=1
-      ;;
-    -h | --help)
-      print_usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $option" >&2
-      print_usage >&2
-      exit 1
-      ;;
+  --all)
+    remove_all_values=1
+    ;;
+  -h | --help)
+    print_usage
+    exit 0
+    ;;
+  *)
+    echo "Unknown option: $option" >&2
+    print_usage >&2
+    exit 1
+    ;;
   esac
 done
 

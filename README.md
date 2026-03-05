@@ -15,7 +15,7 @@ Small, focused Git aliases to speed up common day-to-day workflows:
 ## Quick Install
 
 ```bash
-git clone <YOUR_REPO_URL> git-scripts
+git clone https://github.com/dev-ainz/git-scripts-alias-pack.git git-scripts
 cd git-scripts
 bash scripts/install.sh
 ```
