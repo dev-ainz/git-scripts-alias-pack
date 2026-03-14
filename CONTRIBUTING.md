@@ -14,6 +14,7 @@ Run syntax checks before opening a PR:
 ```bash
 bash -n aliases/pn.sh
 bash -n aliases/rb.sh
+bash -n aliases/bcd.sh
 bash -n aliases/bpd.sh
 bash -n scripts/install.sh
 bash -n scripts/uninstall.sh

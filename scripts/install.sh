@@ -39,14 +39,15 @@ repository_root="$(CDPATH= cd -- "$script_directory/.." && pwd -P)"
 
 pn_script_path="$repository_root/aliases/pn.sh"
 rb_script_path="$repository_root/aliases/rb.sh"
+bcd_script_path="$repository_root/aliases/bcd.sh"
 bpd_script_path="$repository_root/aliases/bpd.sh"
 
-if [ ! -f "$pn_script_path" ] || [ ! -f "$rb_script_path" ] || [ ! -f "$bpd_script_path" ]; then
+if [ ! -f "$pn_script_path" ] || [ ! -f "$rb_script_path" ] || [ ! -f "$bcd_script_path" ] || [ ! -f "$bpd_script_path" ]; then
   echo "Alias scripts were not found. Run this script from the repository checkout." >&2
   exit 1
 fi
 
-chmod +x "$pn_script_path" "$rb_script_path" "$bpd_script_path" >/dev/null 2>&1 || true
+chmod +x "$pn_script_path" "$rb_script_path" "$bcd_script_path" "$bpd_script_path" >/dev/null 2>&1 || true
 
 skipped_alias_count=0
 
@@ -69,6 +70,7 @@ install_alias() {
 
 install_alias "pn" "$pn_script_path"
 install_alias "rb" "$rb_script_path"
+install_alias "bcd" "$bcd_script_path"
 install_alias "bpd" "$bpd_script_path"
 
 if [ "$skipped_alias_count" -gt 0 ]; then

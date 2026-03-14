@@ -66,6 +66,7 @@ remove_alias_if_needed() {
 
 remove_alias_if_needed "pn" "$repository_root/aliases/pn.sh"
 remove_alias_if_needed "rb" "$repository_root/aliases/rb.sh"
+remove_alias_if_needed "bcd" "$repository_root/aliases/bcd.sh"
 remove_alias_if_needed "bpd" "$repository_root/aliases/bpd.sh"
 
 echo "Uninstall completed."

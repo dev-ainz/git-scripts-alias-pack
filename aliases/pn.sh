@@ -11,6 +11,8 @@ if ! git remote get-url origin >/dev/null 2>&1; then
   exit 1
 fi
 
+prefix_message="$*"
+
 has_upstream=1
 if ! git rev-parse --abbrev-ref --symbolic-full-name "@{u}" >/dev/null 2>&1; then
   has_upstream=0
@@ -42,7 +44,13 @@ if ! command -v gh >/dev/null 2>&1; then
 fi
 
 if gh pr view >/dev/null 2>&1; then
-  gh pr comment --body "$commit_lines"
+  if [ -n "$prefix_message" ]; then
+    comment_body="$(printf '%s\n\n%s' "$prefix_message" "$commit_lines")"
+  else
+    comment_body="$commit_lines"
+  fi
+
+  gh pr comment --body "$comment_body"
   exit 0
 fi
 
