@@ -3,13 +3,13 @@ set -eu
 
 print_usage() {
   cat <<'USAGE'
-Usage: git bcd [MAIN_REF] [BASE_BRANCH] [LIMIT] [--missing|-m]
+Usage: git bcd [-l LIMIT] [--hash] [-s] [-t] [-b BASE] [-h HEAD] [--help]
 
 Examples:
   git bcd
-  git bcd origin/main staging
-  git bcd origin/main staging 1000
-  git bcd -m
+  git bcd -b release -h main
+  git bcd --status --time --hash
+  git bcd -l 100
 USAGE
 }
 
@@ -23,76 +23,158 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 127
 fi
 
-show_missing=0
-main_reference=""
-base_reference_argument=""
-result_limit=""
+show_hash=0
+show_status=0
+show_time=0
+head_reference_argument="main"
+base_reference_argument="staging"
+result_limit="50"
+positional_argument_index=0
+
+resolve_branch_reference() {
+  requested_reference="$1"
+  resolved_branch_name="$requested_reference"
+  resolved_reference="$requested_reference"
+  remote_name="${requested_reference%%/*}"
+
+  if [ "$remote_name" != "$requested_reference" ] && git remote | grep -qx "$remote_name"; then
+    resolved_branch_name="${requested_reference#*/}"
+    resolved_reference="$requested_reference"
+    return
+  fi
+
+  if git show-ref --verify --quiet "refs/remotes/origin/$requested_reference"; then
+    resolved_reference="origin/$requested_reference"
+    return
+  fi
+
+  if git show-ref --verify --quiet "refs/heads/$requested_reference"; then
+    resolved_reference="$requested_reference"
+  fi
+}
+
+print_commit_line() {
+  status_label="$1"
+  pr_number="$2"
+  pr_title="$3"
+  commit_name="$4"
+  commit_id="$5"
+  pr_merged_at="$6"
+  revert_commit_sha="$7"
+
+  if [ "$show_status" -eq 1 ]; then
+    printf '%s\t' "$status_label"
+  fi
+
+  printf '#%s\tPR: %s\tCOMMIT: %s' "$pr_number" "$pr_title" "$commit_name"
+
+  if [ "$show_time" -eq 1 ]; then
+    printf '\t%s' "$pr_merged_at"
+  fi
+
+  if [ "$show_hash" -eq 1 ]; then
+    printf '\t%s' "$commit_id"
+
+    if [ -n "$revert_commit_sha" ]; then
+      printf '\trevert=%s' "$revert_commit_sha"
+    fi
+  fi
+
+  printf '\n'
+}
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -m|--missing)
-      show_missing=1
+    -l|--limit)
+      if [ "$#" -lt 2 ]; then
+        echo "Missing value for $1." >&2
+        exit 1
+      fi
+      result_limit="$2"
+      shift 2
+      continue
+      ;;
+    --hash)
+      show_hash=1
       shift
       continue
       ;;
-    -h|--help)
+    -s|--status)
+      show_status=1
+      shift
+      continue
+      ;;
+    -t|--time)
+      show_time=1
+      shift
+      continue
+      ;;
+    -b|--base)
+      if [ "$#" -lt 2 ]; then
+        echo "Missing value for $1." >&2
+        exit 1
+      fi
+      base_reference_argument="$2"
+      shift 2
+      continue
+      ;;
+    -h|--head)
+      if [ "$#" -lt 2 ]; then
+        echo "Missing value for $1." >&2
+        exit 1
+      fi
+      head_reference_argument="$2"
+      shift 2
+      continue
+      ;;
+    --help)
       print_usage
       exit 0
       ;;
-    --)
-      shift
-      break
+    -*)
+      echo "Unknown argument: $1" >&2
+      exit 1
       ;;
   esac
 
-  if [ -z "$main_reference" ]; then
-    main_reference="$1"
-    shift
-    continue
-  fi
+  positional_argument_index=$((positional_argument_index + 1))
 
-  if [ -z "$base_reference_argument" ]; then
-    base_reference_argument="$1"
-    shift
-    continue
-  fi
+  case "$positional_argument_index" in
+    1)
+      head_reference_argument="$1"
+      ;;
+    2)
+      base_reference_argument="$1"
+      ;;
+    3)
+      result_limit="$1"
+      ;;
+    *)
+      echo "Ignoring extra argument: $1" >&2
+      ;;
+  esac
 
-  if [ -z "$result_limit" ]; then
-    result_limit="$1"
-    shift
-    continue
-  fi
-
-  echo "Ignoring extra argument: $1" >&2
   shift
 done
 
-main_reference="${main_reference:-origin/main}"
-base_reference_argument="${base_reference_argument:-staging}"
-result_limit="${result_limit:-500}"
-
 case "$result_limit" in
   ""|*[!0-9]*)
-    result_limit=500
+    result_limit=50
     ;;
 esac
 
 if [ "$result_limit" -eq 0 ]; then
-  result_limit=500
+  result_limit=50
 fi
 
 git fetch origin --prune >/dev/null 2>&1 || true
 
-remote_name="${base_reference_argument%%/*}"
-branch_name_from_argument="${base_reference_argument#*/}"
+resolve_branch_reference "$head_reference_argument"
+head_reference="$resolved_reference"
 
-if [ "$remote_name" != "$base_reference_argument" ] && git remote | grep -qx "$remote_name"; then
-  base_reference="$base_reference_argument"
-  base_branch_name="$branch_name_from_argument"
-else
-  base_branch_name="$base_reference_argument"
-  base_reference="origin/$base_reference_argument"
-fi
+resolve_branch_reference "$base_reference_argument"
+base_reference="$resolved_reference"
+base_branch_name="$resolved_branch_name"
 
 tab_char="$(printf '\t')"
 
@@ -115,7 +197,8 @@ print_commit_lines() {
   pr_number="$1"
   pr_title="$2"
   status_label="$3"
-  extra_field="$4"
+  pr_merged_at="$4"
+  revert_commit_sha="$5"
 
   commit_rows="$(
     gh pr view "$pr_number" \
@@ -125,11 +208,7 @@ print_commit_lines() {
   )"
 
   if [ -z "$commit_rows" ]; then
-    if [ -n "$extra_field" ]; then
-      printf '%s\t#%s\tPR: %s\tCOMMIT: <unknown>\t<unknown>\t%s\n' "$status_label" "$pr_number" "$pr_title" "$extra_field"
-    else
-      printf '%s\t#%s\tPR: %s\tCOMMIT: <unknown>\t<unknown>\n' "$status_label" "$pr_number" "$pr_title"
-    fi
+    print_commit_line "$status_label" "$pr_number" "$pr_title" "<unknown>" "<unknown>" "$pr_merged_at" "$revert_commit_sha"
     return
   fi
 
@@ -137,12 +216,7 @@ print_commit_lines() {
     while IFS="$tab_char" read -r commit_name commit_id; do
       commit_name="${commit_name:-<unknown>}"
       commit_id="${commit_id:-<unknown>}"
-
-      if [ -n "$extra_field" ]; then
-        printf '%s\t#%s\tPR: %s\tCOMMIT: %s\t%s\t%s\n' "$status_label" "$pr_number" "$pr_title" "$commit_name" "$commit_id" "$extra_field"
-      else
-        printf '%s\t#%s\tPR: %s\tCOMMIT: %s\t%s\n' "$status_label" "$pr_number" "$pr_title" "$commit_name" "$commit_id"
-      fi
+      print_commit_line "$status_label" "$pr_number" "$pr_title" "$commit_name" "$commit_id" "$pr_merged_at" "$revert_commit_sha"
     done
 }
 
@@ -154,14 +228,12 @@ printf '%s\n' "$pr_rows" |
       continue
     fi
 
-    if [ -n "$merge_commit_sha" ] && git merge-base --is-ancestor "$merge_commit_sha" "$main_reference" 2>/dev/null; then
+    if [ -n "$merge_commit_sha" ] && git merge-base --is-ancestor "$merge_commit_sha" "$head_reference" 2>/dev/null; then
       continue
     fi
 
     if [ -n "$merge_commit_sha" ] && ! git merge-base --is-ancestor "$merge_commit_sha" "$base_reference" 2>/dev/null; then
-      if [ "$show_missing" -eq 1 ]; then
-        print_commit_lines "$pr_number" "$pr_title" "MISSING_IN_BASE" ""
-      fi
+      print_commit_lines "$pr_number" "$pr_title" "MISSING_IN_BASE" "$pr_merged_at" ""
       continue
     fi
 
@@ -178,9 +250,9 @@ printf '%s\n' "$pr_rows" |
     fi
 
     if [ -n "$merge_commit_sha" ] && [ -n "$revert_commit_sha" ]; then
-      print_commit_lines "$pr_number" "$pr_title" "REVERTED" "revert=$revert_commit_sha"
+      print_commit_lines "$pr_number" "$pr_title" "REVERTED" "$pr_merged_at" "$revert_commit_sha"
       continue
     fi
 
-    print_commit_lines "$pr_number" "$pr_title" "PENDING" ""
+    print_commit_lines "$pr_number" "$pr_title" "PENDING" "$pr_merged_at" ""
   done
